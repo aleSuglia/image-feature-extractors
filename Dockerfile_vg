@@ -1,8 +1,8 @@
-FROM nvidia/cuda:8.0-cudnn7-devel-ubuntu16.04
+FROM nvidia/cuda:10.1-cudnn7-devel-ubuntu18.04
 
 ARG python=3.5
 ENV PYTHON_VERSION=${python}
-ENV NCCL_VERSION=2.3.5-2+cuda8.0
+ENV NCCL_VERSION=2.4.8-1+cuda10.1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
   build-essential \
