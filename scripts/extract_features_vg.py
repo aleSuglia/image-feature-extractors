@@ -1,21 +1,19 @@
 import argparse
 import json
 import os
+import pprint
 from typing import List, Optional, Tuple
 
-import caffe
 import cv2
-import h5py
 import numpy as np
-import pprint
+from fast_rcnn.config import cfg
+from fast_rcnn.nms_wrapper import nms
+from fast_rcnn.test import im_detect, _get_blobs
 from tqdm import tqdm
 
-from fast_rcnn.config import cfg
-from fast_rcnn.test import im_detect, _get_blobs
-from fast_rcnn.nms_wrapper import nms
+import caffe
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
-
 
 # fmt: off
 parser = argparse.ArgumentParser("""
@@ -25,20 +23,20 @@ parser = argparse.ArgumentParser("""
 # fmt: on
 
 parser.add_argument(
-    "--prototxt",
+    "-prototxt",
     default="models/vg_faster_rcnn_end2end/test_rpn.prototxt",
     help="Prototxt file defining the network architecture.",
 )
 parser.add_argument(
-    "--caffemodel",
+    "-caffemodel",
     default="models/vg_faster_rcnn_end2end/resnet101_faster_rcnn_final.caffemodel",
     help="Caffemodel file containing weights of pretrained model.",
 )
 parser.add_argument(
-    "--images", help="Path to a directory containing images for a particular split."
+    "-images", help="Path to a directory containing images for a particular split."
 )
 parser.add_argument(
-    "--annotations",
+    "-annotations",
     help="Path to annotations JSON file (in COCO format) containing image info.",
 )
 parser.add_argument(
@@ -47,9 +45,9 @@ parser.add_argument(
     help="Path to JSON file (in COCO format) containing external boxes (instead of RPN).",
 )
 parser.add_argument(
-    "--output",
-    default="features.h5",
-    help="Path to save the output H5 file with image features.",
+    "-output_path",
+    required=True,
+    help="Path to save the output files with image features.",
 )
 parser.add_argument("--gpu-id", default=0, type=int, help="Which GPU ID to use.")
 
@@ -85,7 +83,7 @@ def _image_ids(annotations_path: str) -> List[Tuple[int, str]]:
 
 
 def resize_larger_edge(
-    image: np.ndarray, dimension: int, force_boxes: Optional[np.ndarray] = None
+        image: np.ndarray, dimension: int, force_boxes: Optional[np.ndarray] = None
 ) -> np.ndarray:
     r"""
     Resize larger edge of the image to ``dimension`` while preserving the aspect ratio.
@@ -122,7 +120,7 @@ def resize_larger_edge(
         factor = image.shape[largest_side_index] / MAX_DIMENSION
         new_dimensions = [0, 0]
         new_dimensions[np.mod(largest_side_index + 1, 2)] = (
-            image.shape[np.mod(largest_size_index + 1, 2)] / factor
+                image.shape[np.mod(largest_side_index + 1, 2)] / factor
         )
         new_dimensions[largest_side_index] = MAX_DIMENSION
 
@@ -140,11 +138,11 @@ def resize_larger_edge(
 
 
 def get_detections_from_im(
-    net,
-    image_file: str,
-    image_id: int,
-    force_boxes: Optional[np.ndarray] = None,
-    conf_thresh: float = 0.2,
+        net,
+        image_file: str,
+        image_id: int,
+        force_boxes: Optional[np.ndarray] = None,
+        conf_thresh: float = 0.2,
 ):
     # shape: (height, width, channels)
     # Record original height and width of the image (before resizing).
@@ -219,17 +217,9 @@ if __name__ == "__main__":
 
     # List of tuples of image IDs and their file names.
     image_ids = _image_ids(_A.annotations)
-
-    output_h5 = h5py.File(_A.output, "w")
-    dt = h5py.special_dtype(vlen=np.float32)
-
-    image_id_dset = output_h5.create_dataset("image_id", (len(image_ids),), np.int64)
-    height_dset = output_h5.create_dataset("height", (len(image_ids),), np.float32)
-    width_dset = output_h5.create_dataset("width", (len(image_ids),), np.float32)
-    num_boxes_dset = output_h5.create_dataset("num_boxes", (len(image_ids),), np.int64)
-    boxes_dset = output_h5.create_dataset("boxes", (len(image_ids),), dt)
-    features_dset = output_h5.create_dataset("features", (len(image_ids),), dt)
-    scores_dset = output_h5.create_dataset("scores", (len(image_ids),), dt)
+    if not os.path.exists(_A.output_path):
+        print("The output path {} doesn't exists. Creating it...".format(_A.output_path))
+        os.makedirs(_A.output_path)
 
     if _A.force_boxes is not None:
         # Externally provided boxes in COCO format.
@@ -242,13 +232,6 @@ if __name__ == "__main__":
                 force_boxes_map[annotation["image_id"]] = [annotation]
             else:
                 force_boxes_map[annotation["image_id"]].append(annotation)
-
-        # Make an H5 dataset to also store predicted classes if external boxes are provided.
-        classes_dset = output_h5.create_dataset(
-            "classes",
-            (len(image_ids),),
-            h5py.special_dtype(vlen=np.uint32)
-        )
 
     caffe.init_log()
     caffe.log("Using device {}".format(_A.gpu_id))
@@ -272,19 +255,21 @@ if __name__ == "__main__":
             net, os.path.join(_A.images, image_file), image_id, force_boxes=force_boxes
         )
 
-        image_id_dset[index] = features_dict["image_id"]
-        height_dset[index] = features_dict["height"]
-        width_dset[index] = features_dict["width"]
-        num_boxes_dset[index] = features_dict["num_boxes"]
-        boxes_dset[index] = features_dict["boxes"].reshape(-1)
-        features_dset[index] = features_dict["features"].reshape(-1)
+        # we get the output features and we store them as separate npz files
+        # we can store metadata as well. We just need to make sure to have two keys:
+        # "features": 2048 RoI vectors
+        # "boxes": bounding box coordinates as [X1, Y1, X2, Y2]
+        output_path = os.path.join(_A.output_path, str(image_id))
+        output_dict = {
+            "features": features_dict["features"].reshape(-1),
+            "boxes": features_dict["boxes"].reshape(-1),
+            "metadata": {
+                "image_id": features_dict["image_id"],
+                "height": features_dict["height"],
+                "width": features_dict["width"],
+                "num_boxes": features_dict["num_boxes"]
+            },
+            "scores": features_dict["scores"].reshape(-1)
+        }
 
-        if _A.force_boxes is not None:
-            # Save classes and confidence scores in output H5.
-            classes_dset[index] = np.asarray([a["category_id"] for a in force_boxes_annotations])
-            scores_dset[index] = np.asarray([a.get("score", 1.0) for a in force_boxes_annotations])
-        else:
-            # Save confidence scores from the detector if using RPN.
-            scores_dset[index] = features_dict["scores"].reshape(-1)
-
-    output_h5.close()
+        np.savez(output_path, **output_dict)
