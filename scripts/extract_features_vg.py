@@ -49,6 +49,11 @@ parser.add_argument(
     required=True,
     help="Path to save the output files with image features.",
 )
+parser.add_argument(
+    "--from_image_path",
+    action="store_true",
+    help="Read images from the specified input path instead from the provided annotations"
+)
 parser.add_argument("--gpu-id", default=0, type=int, help="Which GPU ID to use.")
 
 # Settings for the number of features per image. To re-create pretrained features with 36 features
@@ -60,7 +65,7 @@ MAX_BOXES = 100
 MAX_DIMENSION = 1024
 
 
-def _image_ids(annotations_path: str) -> List[Tuple[int, str]]:
+def _image_ids(annotations_path: str, from_image_path: bool = False) -> List[Tuple[int, str]]:
     r"""
     Given path to an annotation file in COCO format, return ``(image_id, filename)`` tuples.
 
@@ -74,9 +79,11 @@ def _image_ids(annotations_path: str) -> List[Tuple[int, str]]:
     List[Tuple[int, str]]
         List of ``(image_id, filename)`` tuples.
     """
-
-    image_annotations = json.load(open(annotations_path))["images"]
-    image_ids = [(im["id"], im["file_name"]) for im in image_annotations]
+    if not from_image_path:
+        image_annotations = json.load(open(annotations_path))["images"]
+        image_ids = [(im["id"], im["file_name"]) for im in image_annotations]
+    else:
+        image_ids = [(int(os.path.basename(im).replace(".jpg", "")), im) for im in os.listdir(annotations_path)]
 
     image_ids = sorted(image_ids, key=lambda k: k[0])
     return image_ids
@@ -216,7 +223,8 @@ if __name__ == "__main__":
     pprint.pprint(cfg)
 
     # List of tuples of image IDs and their file names.
-    image_ids = _image_ids(_A.annotations)
+    image_ids = _image_ids(_A.images, _A.from_image_path) if _A.from_image_path else _image_ids(_A.annotations, _A.from_image_path)
+
     if not os.path.exists(_A.output_path):
         print("The output path {} doesn't exists. Creating it...".format(_A.output_path))
         os.makedirs(_A.output_path)
