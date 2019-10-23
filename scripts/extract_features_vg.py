@@ -83,7 +83,7 @@ def _image_ids(annotations_path: str, from_image_path: bool = False) -> List[Tup
         image_annotations = json.load(open(annotations_path))["images"]
         image_ids = [(im["id"], im["file_name"]) for im in image_annotations]
     else:
-        image_ids = [(int(os.path.basename(im).replace(".jpg", "")), im) for im in os.listdir(annotations_path)]
+        image_ids = [(os.path.basename(im).replace(".jpg", ""), im) for im in os.listdir(annotations_path)]
 
     image_ids = sorted(image_ids, key=lambda k: k[0])
     return image_ids
