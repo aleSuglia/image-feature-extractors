@@ -1,8 +1,21 @@
 FROM nvidia/cuda:10.1-cudnn7-devel-ubuntu18.04
 
-ARG python=3.5
+ARG python=3.6
 ENV PYTHON_VERSION=${python}
 ENV NCCL_VERSION=2.4.8-1+cuda10.1
+ENV TZ=Europe/London
+ENV DEBIAN_FRONTEND=noninteractive
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+ARG PYTHON_BASEDEPS="build-essential python3-pip"
+ARG PYTHON_BUILDDEPS="libbz2-dev \
+  libc6-dev \
+  libgdbm-dev \
+  libncursesw5-dev \
+  libreadline-gplv2-dev \
+  libsqlite3-dev \
+  libssl-dev \
+  tk-dev"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
   build-essential \
@@ -26,14 +39,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   protobuf-compiler \
   python${PYTHON_VERSION} \
   python${PYTHON_VERSION}-dev \
-  libpng-dev
+  libpng-dev \ 
+  gcc \
+  g++ \ 
+  make \  
+  $PYTHON_BASEDEPS \ 
+  $PYTHON_BUILDDEPS \ 
+  nano
 
 RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
   python${PYTHON_VERSION} get-pip.py && \
   rm get-pip.py
 
-RUN ln -sf /usr/bin/python3.5 /usr/bin/python
+RUN ln -sf /usr/bin/python3.6 /usr/bin/python
 ENV LD_LIBRARY_PATH $LD_LIBRARY_PATH:/usr/lib/x86_64-linux-gnu
+ENV CPLUS_INCLUDE_PATH="$CPLUS_INCLUDE_PATH:/usr/include/python3.6/"
 
 ENV CAFFE_ROOT=/opt/caffe
 WORKDIR $CAFFE_ROOT
@@ -50,21 +70,7 @@ ENV PYCAFFE_ROOT $CAFFE_ROOT/python
 ENV PYTHONPATH $PYCAFFE_ROOT:$PYTHONPATH
 ENV PATH $CAFFE_ROOT/build/tools:$PYCAFFE_ROOT:$PATH
 RUN echo "$CAFFE_ROOT/build/lib" >> /etc/ld.so.conf.d/caffe.conf && ldconfig
-
-ARG PYTHON_BASEDEPS="build-essential python-pip"
-ARG PYTHON_BUILDDEPS="libbz2-dev \
-  libc6-dev \
-  libgdbm-dev \
-  libncursesw5-dev \
-  libreadline-gplv2-dev \
-  libsqlite3-dev \
-  libssl-dev \
-  tk-dev"
-
-# basic packages useful inside the environment
-RUN apt-get update && \
-  apt-get install -y gcc g++ make && \
-  apt-get install -y nano ${PYTHON_BASEDEPS} ${PYTHON_BUILDDEPS}
+ENV CFLAGS="-Wno-narrowing"
 
 # # pip packages
 RUN pip install --trusted-host pypi.python.org \
