@@ -10,6 +10,8 @@ from fast_rcnn.config import cfg
 from fast_rcnn.nms_wrapper import nms
 from fast_rcnn.test import im_detect, _get_blobs
 from tqdm import tqdm
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 import caffe
 
