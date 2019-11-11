@@ -26,10 +26,9 @@ def read_raw_dataset_games(file_path, successful_only=False):
 
 
 guesswhat_files = {
-    "valid": "gw_valid_sample.jsonl"
-    #"train": "guesswhat.train.jsonl.gz",
-    #"valid": "guesswhat.valid.jsonl.gz",
-    #"test": "guesswhat.test.jsonl.gz"
+    "train": "guesswhat.train.jsonl.gz",
+    "valid": "guesswhat.valid.jsonl.gz",
+    "test": "guesswhat.test.jsonl.gz"
 }
 
 parser = ArgumentParser()

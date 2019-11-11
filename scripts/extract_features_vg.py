@@ -6,11 +6,12 @@ from typing import List, Optional, Tuple
 
 import cv2
 import numpy as np
+from PIL import ImageFile
 from fast_rcnn.config import cfg
 from fast_rcnn.nms_wrapper import nms
 from fast_rcnn.test import im_detect, _get_blobs
 from tqdm import tqdm
-from PIL import ImageFile
+
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 import caffe
@@ -218,6 +219,16 @@ def get_detections_from_im(
     return output_dict
 
 
+def format_bbox(bbox):
+    # Note that bbox is of the form [X1, Y1, X2, Y2] as opposed to [X, Y, W, H] in COCO format.
+    return [
+        bbox[0],
+        bbox[1],
+        bbox[2] - bbox[0],
+        bbox[3] - bbox[1]
+    ]
+
+
 if __name__ == "__main__":
 
     _A = parser.parse_args()
@@ -225,7 +236,8 @@ if __name__ == "__main__":
     pprint.pprint(cfg)
 
     # List of tuples of image IDs and their file names.
-    image_ids = _image_ids(_A.images, _A.from_image_path) if _A.from_image_path else _image_ids(_A.annotations, _A.from_image_path)
+    image_ids = _image_ids(_A.images, _A.from_image_path) if _A.from_image_path else _image_ids(_A.annotations,
+                                                                                                _A.from_image_path)
 
     if not os.path.exists(_A.output_path):
         print("The output path {} doesn't exists. Creating it...".format(_A.output_path))
@@ -234,14 +246,6 @@ if __name__ == "__main__":
     if _A.force_boxes is not None:
         # Externally provided boxes in COCO format.
         force_boxes_map = json.load(open(_A.force_boxes))["annotations"]
-
-        # Keep a map of image ID to force boxes.
-        #force_boxes_map = {}
-        #for image_id, annotation in force_boxes_json.items():
-        #    if annotation["image_id"] not in force_boxes_map:
-        #        force_boxes_map[annotation["image_id"]] = [annotation]
-        #    else:
-        #        force_boxes_map[annotation["image_id"]].append(annotation)
 
     caffe.init_log()
     caffe.log("Using device {}".format(_A.gpu_id))
@@ -259,7 +263,7 @@ if __name__ == "__main__":
             else:
                 force_boxes_annotations = force_boxes_map[image_id]
                 force_boxes = np.asarray(
-                    [a["bbox"] for a in force_boxes_annotations], dtype=np.float32
+                    [format_bbox(a["bbox"]) for a in force_boxes_annotations], dtype=np.float32
                 )
         else:
             force_boxes = None
