@@ -133,7 +133,7 @@ def resize_larger_edge(
         )
         new_dimensions[largest_side_index] = MAX_DIMENSION
 
-        image = cv2.resize(image, (new_dimensions[1], new_dimensions[0]))
+        image = cv2.resize(image, (int(new_dimensions[1]), int(new_dimensions[0])))
         height, width, _ = image.shape
 
         if force_boxes is not None:
@@ -157,9 +157,9 @@ def get_detections_from_im(
     # Record original height and width of the image (before resizing).
     image = cv2.imread(image_file)
     height, width, _ = image.shape
-
+    print(image.shape)
     image, force_boxes = resize_larger_edge(image, MAX_DIMENSION, force_boxes)
-
+    print(image.shape)
     scores, boxes, _, _ = im_detect(
         net, image, boxes=force_boxes, force_boxes=(force_boxes is not None)
     )
@@ -233,15 +233,15 @@ if __name__ == "__main__":
 
     if _A.force_boxes is not None:
         # Externally provided boxes in COCO format.
-        force_boxes_json = json.load(open(_A.force_boxes))["annotations"]
+        force_boxes_map = json.load(open(_A.force_boxes))["annotations"]
 
         # Keep a map of image ID to force boxes.
-        force_boxes_map = {}
-        for annotation in force_boxes_json:
-            if annotation["image_id"] not in force_boxes_map:
-                force_boxes_map[annotation["image_id"]] = [annotation]
-            else:
-                force_boxes_map[annotation["image_id"]].append(annotation)
+        #force_boxes_map = {}
+        #for image_id, annotation in force_boxes_json.items():
+        #    if annotation["image_id"] not in force_boxes_map:
+        #        force_boxes_map[annotation["image_id"]] = [annotation]
+        #    else:
+        #        force_boxes_map[annotation["image_id"]].append(annotation)
 
     caffe.init_log()
     caffe.log("Using device {}".format(_A.gpu_id))
@@ -254,10 +254,13 @@ if __name__ == "__main__":
 
         if _A.force_boxes is not None:
             # Get force_boxes if provided through args.
-            force_boxes_annotations = force_boxes_map[image_id]
-            force_boxes = np.asarray(
-                [a["bbox"] for a in force_boxes_annotations], dtype=np.float32
-            )
+            if image_id not in force_boxes_map:
+                force_boxes = None
+            else:
+                force_boxes_annotations = force_boxes_map[image_id]
+                force_boxes = np.asarray(
+                    [a["bbox"] for a in force_boxes_annotations], dtype=np.float32
+                )
         else:
             force_boxes = None
 

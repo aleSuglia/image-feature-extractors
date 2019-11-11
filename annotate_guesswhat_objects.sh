@@ -1,7 +1,7 @@
 #!/bin/bash
 
 python scripts/extract_features_vg.py \
-    -prototxt models/vg_faster_rcnn_end2end/test_rpn.prototxt \
+    -prototxt models/vg_faster_rcnn_end2end/test_force_boxes.prototxt \
     -caffemodel models/vg_faster_rcnn_end2end/resnet101_faster_rcnn_final.caffemodel \
     -images /datasets/guesswhat/img \
     --from_image_path \
