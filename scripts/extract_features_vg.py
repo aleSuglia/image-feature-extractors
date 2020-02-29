@@ -278,15 +278,15 @@ if __name__ == "__main__":
         # "boxes": bounding box coordinates as [X1, Y1, X2, Y2]
         output_path = os.path.join(_A.output_path, str(image_id))
         output_dict = {
-            "features": features_dict["features"].reshape(-1),
-            "boxes": features_dict["boxes"].reshape(-1),
+            "features": features_dict["features"],
+            "boxes": features_dict["boxes"],
             "metadata": {
                 "image_id": features_dict["image_id"],
                 "height": features_dict["height"],
                 "width": features_dict["width"],
                 "num_boxes": features_dict["num_boxes"]
             },
-            "scores": features_dict["scores"].reshape(-1)
+            "scores": features_dict["scores"]
         }
 
         np.savez(output_path, **output_dict)
