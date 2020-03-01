@@ -61,8 +61,8 @@ parser.add_argument("--gpu-id", default=0, type=int, help="Which GPU ID to use."
 
 # Settings for the number of features per image. To re-create pretrained features with 36 features
 # per image, set both values to 36.
-MIN_BOXES = 10
-MAX_BOXES = 100
+MIN_BOXES = 36
+MAX_BOXES = 36
 
 # Maximum size of the largest side of the image.
 MAX_DIMENSION = 1024
